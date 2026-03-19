@@ -6,6 +6,123 @@ Run with: streamlit run app.py
 import streamlit as st
 from utils import extract_text_from_pdf, validate_resume_text
 from ai_engine import analyze_resume
+
+
+def generate_report_text(result: dict) -> str:
+    """Generate a plain-text report from analysis results."""
+    lines = []
+    lines.append("=" * 50)
+    lines.append("AI RESUME ANALYSIS REPORT")
+    lines.append("=" * 50)
+    lines.append(f"\nMatch Score: {result['match_score']}/100")
+    if "score_explanation" in result:
+        lines.append(f"Explanation: {result['score_explanation']}")
+    lines.append(f"\n--- STRENGTHS ---")
+    for s in result["strengths"]:
+        lines.append(f"  + {s}")
+    lines.append(f"\n--- IMPROVEMENTS ---")
+    for imp in result["improvements"]:
+        lines.append(f"  - {imp}")
+    lines.append(f"\n--- MISSING KEYWORDS ---")
+    for kw in result["missing_keywords"]:
+        lines.append(f"  * {kw}")
+    lines.append(f"\n--- REWRITTEN SUMMARY ---")
+    lines.append(result["rewritten_summary"])
+    return "\n".join(lines)
+
+# ─── Example Data Constants (for "Try Example" feature) ───
+
+EXAMPLE_RESUME = """
+PRIYA SHARMA
+Mumbai, Maharashtra | priya.sharma@email.com | +91-98765-43210
+LinkedIn: linkedin.com/in/priyasharma | GitHub: github.com/priyasharma
+
+PROFESSIONAL SUMMARY
+Full-stack developer with 3 years of experience building web
+applications using Python, JavaScript, and cloud services. Led a
+team of 4 to deliver an e-commerce platform serving 10,000+ users.
+Passionate about clean code, test-driven development, and DevOps.
+
+TECHNICAL SKILLS
+Languages: Python, JavaScript, TypeScript, SQL
+Frameworks: Django, Flask, React, Next.js
+Databases: PostgreSQL, MongoDB, Redis
+Cloud & DevOps: AWS (EC2, S3, Lambda), Docker, GitHub Actions
+Tools: Git, Jira, Figma, Postman
+
+WORK EXPERIENCE
+
+Software Developer | TechNova Solutions, Mumbai
+June 2022 - Present
+- Built RESTful APIs in Django serving 50,000+ daily requests
+  with 99.9% uptime
+- Migrated monolith to microservices, reducing deployment time
+  by 60%
+- Implemented CI/CD pipeline with GitHub Actions, cutting
+  release cycles from 2 weeks to 2 days
+- Mentored 2 junior developers through code reviews and pair
+  programming sessions
+
+Junior Developer | WebCraft Studios, Pune
+January 2021 - May 2022
+- Developed responsive front-end components using React and
+  Tailwind CSS
+- Integrated Stripe payment gateway processing INR 5M+
+  monthly transactions
+- Wrote unit tests achieving 85% code coverage across the
+  application
+
+EDUCATION
+B.Tech in Computer Science | VIT University, Vellore
+Graduated: May 2020 | CGPA: 8.6/10
+
+CERTIFICATIONS
+- AWS Certified Cloud Practitioner (2023)
+- Meta Front-End Developer Professional Certificate (2022)
+
+PROJECTS
+ShopEasy - E-commerce Platform
+- Full-stack Django + React app with real-time inventory
+  tracking and Razorpay integration
+- Deployed on AWS with auto-scaling, handling 500+ concurrent
+  users
+"""
+
+EXAMPLE_JOB_DESCRIPTION = """
+Senior Full-Stack Developer - FinTech Startup
+
+About the Role:
+We are looking for a Senior Full-Stack Developer to join our
+growing engineering team. You will design and build scalable
+web applications for our digital payments platform serving
+millions of users across India.
+
+Requirements:
+- 3+ years of experience in full-stack web development
+- Strong proficiency in Python (Django/FastAPI) and
+  JavaScript (React/Next.js)
+- Experience with PostgreSQL, Redis, and message queues
+  (RabbitMQ/Kafka)
+- Hands-on experience with AWS or GCP cloud services
+- Familiarity with Docker, Kubernetes, and CI/CD pipelines
+- Experience with payment gateway integrations (Razorpay,
+  Stripe, UPI)
+- Strong understanding of RESTful API design and
+  microservices architecture
+
+Nice to Have:
+- Experience with FastAPI or GraphQL
+- Knowledge of Kafka or RabbitMQ for event-driven
+  architecture
+- Familiarity with Kubernetes orchestration
+- Contributions to open-source projects
+
+What We Offer:
+- Competitive salary: INR 18-28 LPA
+- ESOPs and performance bonuses
+- Flexible remote work policy
+- Learning budget of INR 50,000/year
+"""
  
 # --- Page Configuration ---
 st.set_page_config(
@@ -33,6 +150,8 @@ if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 if "resume_text" not in st.session_state:
     st.session_state.resume_text = None
+if "example_mode" not in st.session_state:
+    st.session_state.example_mode = False
  
 # --- Sidebar: Inputs ---
 with st.sidebar:
@@ -51,21 +170,49 @@ with st.sidebar:
             st.session_state.resume_text = resume_text
             validation = validate_resume_text(resume_text)
             st.info(f"📊 {validation['word_count']} words extracted")
+
+            # Show errors (red, blocking)
+            for err in validation.get("errors", []):
+                st.error(err)
+
+            # If errors exist, block analysis
+            if validation.get("errors"):
+                st.session_state.resume_text = None
+
+            # Show warnings (yellow, non-blocking)
             for warning in validation["warnings"]:
                 st.warning(warning)
         else:
-            st.error("❌ Could not extract text. Try a different PDF.")
- 
+            st.error(
+                "❌ Could not extract any text from this PDF. "
+                "It may be a scanned (image-only) file. "
+                "Please upload a text-based PDF instead."
+            )
+    # Show example mode indicator  ← NEW BLOCK
+    elif st.session_state.get("example_mode"):
+        st.info("📋 Using example resume data")
+
     st.divider()
  
+    # Job description input  ← UPDATED with example pre-fill
     job_description = st.text_area(
         "Paste the job description",
+        value=EXAMPLE_JOB_DESCRIPTION if st.session_state.get("example_mode") else "",
         height=300,
         placeholder="Paste the full job description here..."
     )
+
  
     st.divider()
- 
+
+    if st.button("🎯 Try with Example Data", use_container_width=True):
+        st.session_state.resume_text = EXAMPLE_RESUME
+        st.session_state.example_mode = True
+        st.rerun()
+
+    st.divider()
+
+    # Analyze button
     can_analyze = (
         st.session_state.resume_text is not None
         and len(job_description.strip()) > 50
@@ -87,7 +234,23 @@ if st.session_state.analysis_result:
     result = st.session_state.analysis_result
  
     if "error" in result:
-        st.error(f"Analysis failed: {result['error']}")
+        st.error(f"⚠️ Analysis failed: {result['error']}")
+
+        # Show raw AI response when JSON parsing failed
+        if "raw" in result:
+            st.markdown("---")
+            st.markdown(
+                "**Sorry — the AI returned a response we couldn't "
+                "parse.** Here is the raw output for reference:"
+            )
+            with st.expander("Show raw AI response", expanded=False):
+                st.code(result["raw"], language="json")
+
+        st.info(
+            "💡 **Tip:** Click **Analyze Resume** again to retry. "
+            "If the problem persists, try shortening your resume "
+            "or simplifying the job description."
+        )
     else:
         col1, col2, col3 = st.columns([1, 1, 1])
  
@@ -146,12 +309,29 @@ if st.session_state.analysis_result:
             )
  
         st.divider()
+        input_tok = result.get("input_tokens", 0)
+        output_tok = result.get("output_tokens", 0)
+        total_tok = result.get("total_tokens", 0)
+        input_cost = result.get("input_cost", 0)
+        output_cost = result.get("output_cost", 0)
+        total_cost = result.get("total_cost", 0)
+
         st.caption(
-            f"Model: {result.get('model', 'N/A')} | "
-            f"Tokens: {result.get('total_tokens', 'N/A')} | "
-            f"Est. cost: ${result.get('total_tokens', 0) * 0.000005:.4f}"
+            f"**Model:** {result.get('model', 'N/A')}  \n"
+            f"**Tokens:** {input_tok:,} input + {output_tok:,} output "
+            f"= {total_tok:,} total  \n"
+            f"**Est. cost:** ${input_cost:.4f} (input) + "
+            f"${output_cost:.4f} (output) = **${total_cost:.4f}**"
         )
- 
+        # Download report
+        report_text = generate_report_text(result)
+        st.download_button(
+            label="📥 Download Report",
+            data=report_text,
+            file_name="resume_analysis_report.txt",
+            mime="text/plain",
+            use_container_width=True
+    )
 else:
     st.markdown("### 👈 Upload a resume and paste a job description to get started")
     st.markdown("")
@@ -159,3 +339,5 @@ else:
     st.markdown("1. Upload your resume as a PDF")
     st.markdown("2. Paste the target job description")
     st.markdown("3. Click Analyze — get a match score, missing keywords, strengths, improvements, and a rewritten summary")
+
+    

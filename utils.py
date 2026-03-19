@@ -52,29 +52,66 @@ def clean_text(text: str) -> str:
  
 def validate_resume_text(text: str) -> dict:
     """
-    Basic validation to check if extracted text looks like a resume.
+    Validate extracted text and return detailed status.
+
     Returns:
-        dict with is_valid (bool), word_count (int), warnings (list)
+        dict with:
+            is_valid (bool)
+            word_count (int)
+            warnings (list)  — yellow, non-blocking
+            errors (list)    — red, blocks analysis
+            sections_found (list)
     """
     warnings = []
+    errors = []
     word_count = len(text.split())
- 
+
+    # ── Scanned / image-only PDF (< 10 words) ────────────
+    if word_count < 10:
+        errors.append(
+            "This looks like a scanned (image-only) PDF. "
+            "No readable text was found. Please upload a "
+            "text-based PDF, or copy-paste your resume into "
+            "a Word doc and re-export as PDF."
+        )
+        return {
+            "is_valid": False,
+            "word_count": word_count,
+            "warnings": warnings,
+            "errors": errors,
+            "sections_found": [],
+        }
+
+    # ── Very short resume (< 50 words) — warn, allow ─────
     if word_count < 50:
-        warnings.append("Very short text. May be a scanned PDF (image-based).")
-        warnings.append("Tip: Use a text-based PDF for best results.")
- 
+        warnings.append(
+            "Very short text (under 50 words). Analysis may "
+            "be less accurate. Consider a more detailed resume."
+        )
+
+    # ── Very long resume (> 5000 words) — warn about cost ─
     if word_count > 5000:
-        warnings.append("Very long resume. Consider trimming to most relevant content.")
- 
+        estimated_tokens = int(word_count * 1.3)
+        warnings.append(
+            f"Very long resume ({word_count} words ≈ "
+            f"{estimated_tokens} tokens). This will use more "
+            "API tokens. Consider trimming to relevant content."
+        )
+
+    # ── Check for resume-like sections ────────────────────
     resume_keywords = ["experience", "education", "skills", "work", "project"]
     found_keywords = [kw for kw in resume_keywords if kw.lower() in text.lower()]
- 
+
     if len(found_keywords) == 0:
-        warnings.append("This doesn't appear to be a resume. No common resume sections found.")
- 
+        warnings.append(
+            "This doesn't appear to be a resume — no common "
+            "sections (Experience, Education, Skills) found."
+        )
+
     return {
-        "is_valid": word_count >= 50 and len(found_keywords) > 0,
+        "is_valid": word_count >= 10 and len(found_keywords) > 0,
         "word_count": word_count,
         "warnings": warnings,
+        "errors": errors,
         "sections_found": found_keywords,
     }

@@ -12,6 +12,7 @@ Pattern: This is the exact pattern for any LLM-powered feature:
 import os
 import json
 import time
+from urllib import response
 from openai import OpenAI, APIError, APITimeoutError, RateLimitError
 from dotenv import load_dotenv
 from prompts import SYSTEM_PROMPT, build_analysis_prompt
@@ -19,14 +20,26 @@ from prompts import SYSTEM_PROMPT, build_analysis_prompt
 load_dotenv()
  
 # Initialize the OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+#client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+try:
+    import streamlit as st
+    api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+except Exception:
+    api_key = os.getenv("OPENAI_API_KEY")
+
+client = OpenAI(api_key=api_key)
  
 # Configuration
 MODEL = "gpt-4.1-mini"
 MAX_TOKENS = 4096
 MAX_RETRIES = 3
 RETRY_DELAY = 2
- 
+
+# GPT-4o Pricing (per 1 token)
+#   Input:  $2.50  per 1M tokens
+#   Output: $10.00 per 1M tokens
+INPUT_COST_PER_TOKEN = 0.80 / 1_000_000
+OUTPUT_COST_PER_TOKEN = 3.20 / 1_000_000
  
 def analyze_resume(resume_text: str, job_description: str) -> dict:
     """
@@ -63,10 +76,21 @@ def analyze_resume(resume_text: str, job_description: str) -> dict:
  
             if result:
                 # Add metadata
+                input_tokens = response.usage.prompt_tokens
+                output_tokens = response.usage.completion_tokens
+                total_tokens = response.usage.total_tokens
+
+                input_cost = input_tokens * INPUT_COST_PER_TOKEN
+                output_cost = output_tokens * OUTPUT_COST_PER_TOKEN
+                total_cost = input_cost + output_cost
+
                 result["model"] = MODEL
-                result["input_tokens"] = response.usage.prompt_tokens
-                result["output_tokens"] = response.usage.completion_tokens
-                result["total_tokens"] = response.usage.total_tokens
+                result["input_tokens"] = input_tokens
+                result["output_tokens"] = output_tokens
+                result["total_tokens"] = total_tokens
+                result["input_cost"] = input_cost
+                result["output_cost"] = output_cost
+                result["total_cost"] = total_cost
                 return result
             else:
                 return {"error": "Failed to parse AI response", "raw": raw_text}
@@ -82,15 +106,15 @@ def analyze_resume(resume_text: str, job_description: str) -> dict:
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY)
                 continue
-            return {"error": "API request timed out after all retries"}
+            return {"error": "The AI took too long to respond. This can happen during peak hours. Please try again in a minute."}
  
         except APIError as e:
-            return {"error": f"API error: {str(e)}"}
+            return {"error": f"OpenAI API error: {str(e)}. If this persists, check your API key and billing at platform.openai.com."}
  
         except Exception as e:
-            return {"error": f"Unexpected error: {str(e)}"}
+            return {"error": f"Something unexpected went wrong: {str(e)}. Please try again."}
  
-    return {"error": "Failed after all retry attempts"}
+    return {"error": "Failed after multiple retry attempts. The API may be experiencing high traffic. Please wait and try again."}
  
  
 def parse_ai_response(raw_text: str) -> dict | None:
