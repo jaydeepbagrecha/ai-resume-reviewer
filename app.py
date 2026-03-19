@@ -155,6 +155,13 @@ if "example_mode" not in st.session_state:
  
 # --- Sidebar: Inputs ---
 with st.sidebar:
+    if st.button("🎯 Try with Example Data", use_container_width=True):
+        st.session_state.resume_text = EXAMPLE_RESUME
+        st.session_state.example_mode = True
+        st.rerun()
+
+    st.divider()
+
     st.header("📤 Upload & Configure")
  
     uploaded_file = st.file_uploader(
@@ -203,13 +210,6 @@ with st.sidebar:
     )
 
  
-    st.divider()
-
-    if st.button("🎯 Try with Example Data", use_container_width=True):
-        st.session_state.resume_text = EXAMPLE_RESUME
-        st.session_state.example_mode = True
-        st.rerun()
-
     st.divider()
 
     # Analyze button
