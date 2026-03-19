@@ -129,6 +129,7 @@ st.set_page_config(
     page_title="AI Resume Reviewer",
     page_icon="📄",
     layout="wide",
+    initial_sidebar_state="expanded"
 )
  
 # --- Custom CSS for better styling ---
@@ -137,6 +138,16 @@ st.markdown("""
 .score-high { color: #27ae60; font-size: 48px; font-weight: bold; }
 .score-mid { color: #f39c12; font-size: 48px; font-weight: bold; }
 .score-low { color: #e74c3c; font-size: 48px; font-weight: bold; }
+@media (max-width: 768px) {
+    button[kind="header"],
+    [data-testid="collapsedControl"] {
+        width: 48px  !important;
+        height: 48px !important;
+        background-color: #ff4b4b !important;
+        border-radius: 50% !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
  
