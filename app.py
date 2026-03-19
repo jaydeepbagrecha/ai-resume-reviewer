@@ -148,6 +148,12 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
     }
 }
+@media (max-width: 768px) {
+    [data-testid="stSidebar"] {
+        min-width: 85vw !important;
+        max-width: 85vw !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
  
