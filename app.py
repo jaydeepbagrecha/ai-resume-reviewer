@@ -148,6 +148,10 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
     }
 }
+<div class="mobile-hint">
+    <strong>👆 Tap the red ☰ button (top-left)</strong><br>
+    to upload your resume and paste the job description.
+</div>
 </style>
 """, unsafe_allow_html=True)
  
