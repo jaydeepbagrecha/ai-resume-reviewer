@@ -90,13 +90,29 @@ def validate_resume_text(text: str) -> dict:
         )
 
     # ── Very long resume (> 5000 words) — warn about cost ─
-    if word_count > 5000:
-        estimated_tokens = int(word_count * 1.3)
-        warnings.append(
-            f"Very long resume ({word_count} words ≈ "
-            f"{estimated_tokens} tokens). This will use more "
-            "API tokens. Consider trimming to relevant content."
+     #if word_count > 5000:
+     #warnings.append("❌ This file exceeds the 5,000-word limit and is not a valid resume. "
+                     "Resumes are typically 300–1,000 words. Please upload an actual resume.")
+     #   estimated_tokens = int(word_count * 1.3)
+     #   warnings.append(
+     #      f"Very long resume ({word_count} words ≈ "
+     #       f"{estimated_tokens} tokens). This will use more "
+     #       "API tokens. Consider trimming to relevant content."
+     #   )
+     if word_count > 5000:
+        errors.append(
+            f"🚫 INVALID FILE — {word_count:,} words detected. "
+            "This is not a resume (resumes are typically "
+            "300–1,000 words). Maximum allowed: 5,000 words. "
+            "Please upload an actual resume to continue."
         )
+        return {
+            "is_valid": False,
+            "word_count": word_count,
+            "warnings": warnings,
+            "errors": errors,
+            "sections_found": [],
+        }
 
     # ── Check for resume-like sections ────────────────────
     resume_keywords = ["experience", "education", "skills", "work", "project"]
@@ -109,7 +125,7 @@ def validate_resume_text(text: str) -> dict:
         )
 
     return {
-        "is_valid": word_count >= 10 and len(found_keywords) > 0,
+        "is_valid": word_count >= 10 and word_count<=5000 and len(found_keywords) > 0,
         "word_count": word_count,
         "warnings": warnings,
         "errors": errors,
