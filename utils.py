@@ -90,7 +90,7 @@ def validate_resume_text(text: str) -> dict:
         )
 
     # ── Very long resume (> 5000 words) — show error ─
-     if word_count > 5000:
+    if word_count > 5000:
         errors.append(
             f"🚫 INVALID FILE — {word_count:,} words detected. "
             "This is not a resume (resumes are typically "
